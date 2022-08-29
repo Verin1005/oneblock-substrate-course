@@ -1,5 +1,3 @@
-
-
 t:
 	cargo test -p pallet-poe
 
