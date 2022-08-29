@@ -1,2 +1,2 @@
 # oneblock substrate course
-oneblock 进阶系列课程的仓库
+oneblock 进阶系列课程作业仓库

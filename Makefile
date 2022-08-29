@@ -1,5 +1,8 @@
 
 
+t:
+	cargo test -p pallet-poe
+
 b:
 	cargo build --release
 
