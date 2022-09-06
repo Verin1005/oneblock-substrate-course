@@ -132,6 +132,7 @@ pub mod pallet {
 			kitty_id_2: T::KittyIndex,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+            Self::breed_kitty(who.clone(),kitty_id_1,kitty_id_2)?;
 			Ok(())
 		}
 
