@@ -270,7 +270,7 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 // local
-impl pallet_example::Config for Runtime {
+impl pallet_kitties::Config for Runtime {
 	type Event = Event;
 }
 
@@ -293,7 +293,7 @@ construct_runtime!(
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
 		// local
-		ExampleModule: pallet_example,
+		KittiesModule: pallet_kitties,
 	}
 );
 
@@ -339,7 +339,7 @@ mod benches {
 		[pallet_balances, Balances]
 		[pallet_timestamp, Timestamp]
 		[pallet_template, TemplateModule]
-		[pallet_example, ExampleModule]
+		[pallet_kitties, KittiesModule]
 	);
 }
 

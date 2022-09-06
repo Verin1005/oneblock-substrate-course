@@ -1,7 +1,7 @@
 [package]
-name = "pallet-example"
+name = "pallet-kitties"
 version = "1.0.0"
-description = "FRAME pallet example."
+description = "FRAME pallet kitties."
 authors = ["sunwenming <https://github.com/sunwenming>"]
 homepage = "https://github.com/sunwenming"
 edition = "2021"
