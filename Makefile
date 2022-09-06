@@ -1,8 +1,8 @@
 t:
-	cargo test -p pallet-example
+	cargo test -p pallet-kitties
 
 b:
-	cargo build --release
+	cargo build -p pallet-kitties
 
 br:
 	cargo build --release && ./target/release/node-template --dev
