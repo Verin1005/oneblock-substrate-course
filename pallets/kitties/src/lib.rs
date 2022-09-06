@@ -25,8 +25,9 @@ pub mod pallet {
     type KittyDna = [u8; 16];
 
     /// 定义余额类型
-    // type BalanceOf<T> =
-    // <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+    type BalanceOf<T> =
+    <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+
     #[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     pub struct Kitty(KittyDna);
 
@@ -55,10 +56,12 @@ pub mod pallet {
         + Debug
         + MaxEncodedLen
         + TypeInfo;
-
-        // 最大拥有的小猫数量
+        /// 最大拥有的小猫数量
         #[pallet::constant]
         type MaxOwnerKitty: Get<u32>;
+        /// 小猫的质押金额
+        #[pallet::constant]
+        type StakeAmount: Get<BalanceOf<Self>>;
     }
 
     /// kitty 的自增 id, 从 1 开始
@@ -98,6 +101,8 @@ pub mod pallet {
         NotOwner,
         /// 超过最大拥有小猫数量
         OverflowMaxOwnerKitty,
+        /// 质押金额不足
+        InsufficientStakeAmount,
     }
 
     #[pallet::call]
@@ -117,6 +122,9 @@ pub mod pallet {
             NextKittyId::<T>::set(kitty_id + 1u32.into());
             UserKitties::<T>::try_mutate(&who, |vec|
                 vec.try_push(kitty_id)).map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
+
+            // 质押金额
+            T::Currency::reserve(&who, T::StakeAmount::get()).map_err(|_| Error::<T>::InsufficientStakeAmount)?;
 
             Self::deposit_event(Event::<T>::Created { who, kitty_id, kitty });
             Ok(())
@@ -153,6 +161,9 @@ pub mod pallet {
             UserKitties::<T>::try_mutate(&who, |vec|
                 vec.try_push(kitty_id)).map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
 
+            // 质押金额
+            T::Currency::reserve(&who, T::StakeAmount::get()).map_err(|_| Error::<T>::InsufficientStakeAmount)?;
+
             Self::deposit_event(Event::<T>::Bred { who, kitty_id, kitty });
             Ok(())
         }
@@ -178,6 +189,11 @@ pub mod pallet {
             })?;
             UserKitties::<T>::try_mutate(&to, |vec|
                 vec.try_push(kitty_id)).map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
+
+            // 现在的主人质押金额
+            T::Currency::reserve(&to, T::StakeAmount::get()).map_err(|_| Error::<T>::InsufficientStakeAmount)?;
+            // 由于这个方法不会失败,放在最后执行。 之前的主人解除质押金额
+            let _ = T::Currency::unreserve(&who, T::StakeAmount::get());
 
             Self::deposit_event(Event::<T>::Transferred { from: who, to, kitty_id });
             Ok(())
