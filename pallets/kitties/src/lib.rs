@@ -64,7 +64,7 @@ pub mod pallet {
 		type StakeAmount: Get<BalanceOf<Self>>;
 	}
 
-	/// kitty 的自增 id, 从 1 开始
+	/// kitty 的自增 id
 	#[pallet::storage]
 	#[pallet::getter(fn next_kitty_id)]
 	pub type NextKittyId<T: Config> = StorageValue<_, T::KittyIndex, ValueQuery>;
