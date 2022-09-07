@@ -1,10 +1,11 @@
 use crate as pallet_kitties;
-use frame_support::traits::{ConstU16, ConstU64};
+use frame_support::traits::{ConstU128, ConstU16, ConstU32, ConstU64};
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
+	BuildStorage,
 };
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -23,6 +24,8 @@ frame_support::construct_runtime!(
 		KittiesModule: pallet_kitties,
 	}
 );
+/// Balance of an account.
+pub type Balance = u128;
 
 impl system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
@@ -54,41 +57,49 @@ impl system::Config for Test {
 
 impl pallet_randomness_collective_flip::Config for Test {}
 
-impl pallet_balances::Config for Runtime {
+impl pallet_balances::Config for Test {
+	/// The type for recording an account's balance.
+	type Balance = Balance;
+	type DustRemoval = ();
+	/// The ubiquitous event type.
+	type Event = Event;
+	type ExistentialDeposit = ConstU128<1>;
+	type AccountStore = System;
+	type WeightInfo = ();
 	type MaxLocks = frame_support::traits::ConstU32<50>;
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	/// The type for recording an account's balance.
-	type Balance = u64;
-	/// The ubiquitous event type.
-	type Event = Event;
-	type DustRemoval = ();
-	type ExistentialDeposit = ConstU128<500>;
-	type AccountStore = System;
-	type WeightInfo = ();
 }
 
 impl pallet_kitties::Config for Test {
 	type Event = Event;
 	type Randomness = RandomnessCollectiveFlip;
 	type Currency = Balances;
-	type KittyIndex = u64;
+	type KittyIndex = u32;
+	type MaxOwnerKitty = ConstU32<999>;
+	type StakeAmount = ConstU128<500>;
 }
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	GenesisConfig {
-		//
 		balances: BalancesConfig {
-			balances: vec![(1,1000),(2,1000),(3,1000)],
+			balances: vec![(1, 1000), (2, 500), (3, 1000), (4, 499), (10, 500000)],
 		},
 		..Default::default()
 	}
-	.assimilate_storage(&mut t)
+	.assimilate_storage(&mut t) // use sp_runtime::BuildStorage;
 	.unwrap();
 
 	let mut ext = sp_io::TestExternalities::new(t);
-	// ext.execute_with(|| System::set_block_number(1));
-	ext	
+	ext.execute_with(|| System::set_block_number(1));
+	ext
+}
+
+// 获取所有的事件
+pub fn events() -> Vec<Event> {
+	let evt = System::events().into_iter().map(|evt| evt.event).collect::<Vec<_>>();
+	System::reset_events();
+	evt
 }

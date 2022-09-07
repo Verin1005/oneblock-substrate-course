@@ -14,26 +14,24 @@ mod benchmarking;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{
-		log::info,
 		pallet_prelude::*,
 		traits::{Currency, Randomness, ReservableCurrency},
 	};
 	use frame_system::pallet_prelude::*;
 	use sp_io::hashing::blake2_128;
 	use sp_runtime::traits::Bounded;
-	use std::fmt::Debug;
+	use sp_std::fmt::Debug;
 
 	// ----------------------------------------------------------------
 	type KittyDna = [u8; 16];
-
 	/// 定义余额类型
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-
+	/// 小猫的信息
 	#[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-	pub struct Kitty(KittyDna);
-
+	pub struct Kitty(pub KittyDna);
 	// ----------------------------------------------------------------
+
 	#[pallet::pallet]
 	#[pallet::generate_store(pub (super) trait Store)]
 	pub struct Pallet<T>(_);
@@ -103,13 +101,15 @@ pub mod pallet {
 		/// kitty_id 无效/溢出
 		InvalidKittyId,
 		/// kitty_id 相同
-		SomeKittyId,
+		SameKittyId,
 		/// 不是小猫的主人
 		NotOwner,
 		/// 超过最大拥有小猫数量
 		OverflowMaxOwnerKitty,
 		/// 质押金额不足
 		InsufficientStakeAmount,
+		/// 质押金额不足
+		DuplicateKitty,
 	}
 
 	#[pallet::call]
@@ -132,7 +132,7 @@ pub mod pallet {
 			kitty_id_2: T::KittyIndex,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-            Self::breed_kitty(who.clone(),kitty_id_1,kitty_id_2)?;
+			Self::breed_kitty(who.clone(), kitty_id_1, kitty_id_2)?;
 			Ok(())
 		}
 
@@ -144,45 +144,12 @@ pub mod pallet {
 			to: T::AccountId,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			// 检查小猫是否自己的
-			Self::get_kitty(kitty_id).map_err(|_| Error::<T>::InvalidKittyId)?;
-			let owner = Self::kitty_owner(kitty_id);
-			ensure!(owner == Some(who.clone()), Error::<T>::NotOwner);
-			KittyOwner::<T>::set(kitty_id, Some(to.clone()));
-			// 将之前的小猫数组清除
-			UserKitties::<T>::try_mutate(&who, |vec| -> DispatchResult {
-				// 获取索引
-				if let Some(index) = vec.iter().position(|&x| x == kitty_id) {
-					vec.swap_remove(index);
-					Ok(())
-				} else {
-					Err(Error::<T>::InvalidKittyId.into())
-				}
-			})?;
-			UserKitties::<T>::try_mutate(&to, |vec| vec.try_push(kitty_id))
-				.map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
-
-			// 现在的主人质押金额
-			T::Currency::reserve(&to, T::StakeAmount::get())
-				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
-			// 由于这个方法不会失败,放在最后执行。 之前的主人解除质押金额
-			let _ = T::Currency::unreserve(&who, T::StakeAmount::get());
-
-			Self::deposit_event(Event::<T>::Transferred { from: who, to, kitty_id });
+			Self::transfer_kitty(who, to, kitty_id)?;
 			Ok(())
 		}
 	}
 
 	impl<T: Config> Pallet<T> {
-		/// 生成小猫的 dna
-		fn gen_dna(who: &T::AccountId) -> KittyDna {
-			let payload = (
-				T::Randomness::random(&b"dna"[..]),
-				&who,
-				frame_system::Pallet::<T>::extrinsic_index().unwrap_or_default(),
-			);
-			payload.using_encoded(blake2_128)
-		}
 		// 创建一只小猫
 		fn mint_kitty(who: T::AccountId, dna: KittyDna) -> Result<T::KittyIndex, DispatchError> {
 			// 获取小猫自增 id
@@ -192,52 +159,85 @@ pub mod pallet {
 			Kitties::<T>::insert(&kitty_id, &kitty);
 			KittyOwner::<T>::insert(&kitty_id, &who);
 			NextKittyId::<T>::set(kitty_id + 1u32.into());
-			UserKitties::<T>::try_mutate(&who, |vec| vec.try_push(kitty_id))
+			UserKitties::<T>::try_append(&who, kitty_id)
 				.map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
-			// 质押金额
+			// 作业4: 质押金额
 			T::Currency::reserve(&who, T::StakeAmount::get())
 				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
 
 			Self::deposit_event(Event::<T>::Created { who, kitty_id, kitty });
 			Ok(kitty_id)
 		}
-        fn breed_kitty(who:T::AccountId,kitty_id_1:T::KittyIndex,kitty_id_2:T::KittyIndex)-> Result<T::KittyIndex, DispatchError> {
-            // 父母不能相同
-            ensure!(kitty_id_1 == kitty_id_2, Error::<T>::SomeKittyId);
-            // 检查父母是否存在
-let kitty_1 = Self::get_kitty(kitty_id_1).map_err(|_| Error::<T>::InvalidKittyId)?;
-let kitty_2 = Self::get_kitty(kitty_id_2).map_err(|_| Error::<T>::InvalidKittyId)?;
-// 获取小猫自增 id
-let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::InvalidKittyId)?;
-// 生成小猫 dna
-let dna = Self::gen_dna(&who);
-// dna 依靠父母重构
-let mut new_dna = KittyDna::default();
-for i in 0..kitty_1.0.len() {
-    let a = dna[i];
-    let b = !dna[i];
-    let c = kitty_1.0[i] & dna[i];
-    info!("--------------------------------{a},{b},{c}");
-    new_dna[i] = (kitty_1.0[i] & dna[i]) | (kitty_2.0[i] & !dna[i]);
-}
-info!("父小猫: {:?}", kitty_1.0);
-info!("母小猫: {:?}", kitty_2.0);
-info!("新小猫: {new_dna:?}");
-let kitty = Kitty(new_dna);
-// 入库
-Kitties::<T>::insert(&kitty_id, &kitty);
-KittyOwner::<T>::insert(&kitty_id, &who);
-NextKittyId::<T>::set(kitty_id + 1u32.into());
-UserKitties::<T>::try_mutate(&who, |vec| vec.try_push(kitty_id))
-    .map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
+		// 繁育一只小猫
+		fn breed_kitty(
+			who: T::AccountId,
+			kitty_id_1: T::KittyIndex,
+			kitty_id_2: T::KittyIndex,
+		) -> Result<T::KittyIndex, DispatchError> {
+			// 父母不能相同
+			ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameKittyId);
+			// 检查父母是否存在
+			let kitty_1 = Self::get_kitty(kitty_id_1).map_err(|_| Error::<T>::InvalidKittyId)?;
+			let kitty_2 = Self::get_kitty(kitty_id_2).map_err(|_| Error::<T>::InvalidKittyId)?;
+			// 获取小猫自增 id
+			let kitty_id = Self::get_next_id().map_err(|_| Error::<T>::InvalidKittyId)?;
+			// 生成小猫 dna
+			let rand_dna = Self::gen_dna(&who);
+			// dna 依靠父母重构
+			let mut new_dna = KittyDna::default();
+			for i in 0..kitty_1.0.len() {
+				// 0 choose kitty2, and 1 choose kitty1
+				new_dna[i] = (kitty_1.0[i] & rand_dna[i]) | (kitty_2.0[i] & !rand_dna[i]);
+			}
+			let kitty = Kitty(new_dna);
+			// 入库
+			Kitties::<T>::insert(&kitty_id, &kitty);
+			KittyOwner::<T>::insert(&kitty_id, &who);
+			NextKittyId::<T>::set(kitty_id + 1u32.into());
+			UserKitties::<T>::try_append(&who, kitty_id)
+				.map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
+			// 质押金额
+			T::Currency::reserve(&who, T::StakeAmount::get())
+				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
 
-// 质押金额
-T::Currency::reserve(&who, T::StakeAmount::get())
-    .map_err(|_| Error::<T>::InsufficientStakeAmount)?;
+			Self::deposit_event(Event::<T>::Bred { who, kitty_id, kitty });
+			Ok(kitty_id)
+		}
 
-Self::deposit_event(Event::<T>::Bred { who, kitty_id, kitty });
-Ok(kitty_id)
-        }
+		// 转让一只小猫
+		fn transfer_kitty(
+			from: T::AccountId,
+			to: T::AccountId,
+			kitty_id: T::KittyIndex,
+		) -> DispatchResult {
+			Self::get_kitty(kitty_id).map_err(|_| Error::<T>::InvalidKittyId)?;
+			// 检查小猫是否自己的
+			let owner = Self::kitty_owner(kitty_id);
+			ensure!(owner == Some(from.clone()), Error::<T>::NotOwner);
+			KittyOwner::<T>::set(kitty_id, Some(to.clone()));
+			// 将之前的小猫数组清除
+			UserKitties::<T>::try_mutate(&from, |vec| -> DispatchResult {
+				// 获取索引
+				if let Some(index) = vec.iter().position(|&x| x == kitty_id) {
+					vec.swap_remove(index);
+					Ok(())
+				} else {
+					Err(Error::<T>::InvalidKittyId.into())
+				}
+			})?;
+
+			UserKitties::<T>::try_mutate(&to, |vec| vec.try_push(kitty_id))
+				.map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
+
+			// 新的主人质押金额
+			T::Currency::reserve(&to, T::StakeAmount::get())
+				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
+			// 之前的主人解除质押金额. 由于这个方法不会失败,放在最后执行。
+			let _ = T::Currency::unreserve(&from, T::StakeAmount::get());
+
+			Self::deposit_event(Event::<T>::Transferred { from, to, kitty_id });
+			Ok(())
+		}
 		/// 获取小猫的 id
 		fn get_next_id() -> Result<T::KittyIndex, ()> {
 			let max = T::KittyIndex::max_value();
@@ -254,6 +254,16 @@ Ok(kitty_id)
 				Some(kitty) => Ok(kitty),
 				None => Err(()),
 			}
+		}
+		/// 生成小猫的 dna
+		fn gen_dna(who: &T::AccountId) -> KittyDna {
+			let payload = (
+				T::Randomness::random(&b"dna"[..]),
+				who,
+				frame_system::Pallet::<T>::extrinsic_index().unwrap_or_default(),
+				frame_system::Pallet::<T>::block_number(),
+			);
+			payload.using_encoded(blake2_128)
 		}
 	}
 }

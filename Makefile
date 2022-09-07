@@ -1,5 +1,7 @@
 t:
 	cargo test -p pallet-kitties
+tt:
+	RUST_BACKTRACE=1 cargo test -p pallet-kitties
 
 b:
 	cargo build -p pallet-kitties
