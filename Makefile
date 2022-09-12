@@ -8,3 +8,9 @@ b:
 
 br:
 	cargo build --release && ./target/release/node-template --dev
+
+server:
+	cargo build --release && ./target/release/node-template --dev
+
+client:
+	cd substrate-front-end-template && yarn install && yarn start
