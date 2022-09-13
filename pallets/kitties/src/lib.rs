@@ -30,6 +30,17 @@ pub mod pallet {
 	/// 小猫的信息
 	#[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 	pub struct Kitty(pub KittyDna);
+
+	/// 定义账户类型
+	type AccountIdOf<T> = <T as frame_system::Config>::AccountId;
+	/// web 小猫的信息
+	#[derive(Clone, Encode, Decode, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	pub struct WebKitty<T: Config> {
+		pub id: T::KittyIndex,
+		pub dna: KittyDna,
+		pub owner: AccountIdOf<T>,
+	}
 	// ----------------------------------------------------------------
 
 	#[pallet::pallet]
@@ -73,6 +84,10 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn kitties)]
 	pub type Kitties<T: Config> = StorageMap<_, Blake2_128Concat, T::KittyIndex, Kitty>;
+	/// 前端需要读取的 kitty 信息
+	#[pallet::storage]
+	#[pallet::getter(fn web_kitties)]
+	pub type WebKitties<T: Config> = StorageMap<_, Blake2_128Concat, T::KittyIndex, WebKitty<T>>;
 	/// kitty 的主人
 	#[pallet::storage]
 	#[pallet::getter(fn kitty_owner)]
@@ -165,6 +180,8 @@ pub mod pallet {
 			T::Currency::reserve(&who, T::StakeAmount::get())
 				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
 
+			WebKitties::<T>::insert(&kitty_id, &WebKitty { id: kitty_id, dna, owner: who.clone() });
+
 			Self::deposit_event(Event::<T>::Created { who, kitty_id, kitty });
 			Ok(kitty_id)
 		}
@@ -200,6 +217,11 @@ pub mod pallet {
 			T::Currency::reserve(&who, T::StakeAmount::get())
 				.map_err(|_| Error::<T>::InsufficientStakeAmount)?;
 
+			WebKitties::<T>::insert(
+				&kitty_id,
+				&WebKitty { id: kitty_id, dna: new_dna, owner: who.clone() },
+			);
+
 			Self::deposit_event(Event::<T>::Bred { who, kitty_id, kitty });
 			Ok(kitty_id)
 		}
@@ -225,6 +247,12 @@ pub mod pallet {
 					Err(Error::<T>::InvalidKittyId.into())
 				}
 			})?;
+			// kitty 信息更新
+			let kitty = Self::get_kitty(kitty_id).map_err(|_| Error::<T>::InvalidKittyId)?;
+			WebKitties::<T>::insert(
+				&kitty_id,
+				&WebKitty { id: kitty_id, dna: kitty.0, owner: to.clone() },
+			);
 
 			UserKitties::<T>::try_mutate(&to, |vec| vec.try_push(kitty_id))
 				.map_err(|_| Error::<T>::OverflowMaxOwnerKitty)?;
