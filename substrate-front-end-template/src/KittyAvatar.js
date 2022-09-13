@@ -102,7 +102,6 @@ const KittyAvatar = (props) => {
   if (!dna) return null;
 
   const cat = dnaToAttributes(dna);
-  console.log(cat);
 
   return (
     <div style={outerStyle}>

@@ -16,6 +16,7 @@ const TransferModal = (props) => {
   };
 
   const confirmAndClose = (unsub) => {
+    console.log("??????");
     unsub();
     setOpen(false);
   };
@@ -51,7 +52,7 @@ const TransferModal = (props) => {
           attrs={{
             palletRpc: "kittiesModule",
             callable: "transfer",
-            inputParams: [formValue.target, kitty.id],
+            inputParams: [kitty.id, formValue.target],
             paramFields: [true, true],
           }}
         />
@@ -68,7 +69,6 @@ const KittyCard = (props) => {
   const displayDna = dna && dna.join(", ");
   const displayId = id === null ? "" : id < 10 ? `0${id}` : id.toString();
   const isSelf = accountPair.address === kitty.owner;
-  console.log(accountPair.address);
   return (
     <Card>
       {isSelf && (
@@ -100,7 +100,6 @@ const KittyCard = (props) => {
 
 const KittyCards = (props) => {
   const { kitties, accountPair, setStatus } = props;
-  console.log(kitties);
   if (kitties.length === 0) {
     return (
       <Message info>
