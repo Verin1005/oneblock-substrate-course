@@ -16,3 +16,5 @@
 .direnv
 .vscode
 .idea
+substrate-front-end-template/build
+substrate-front-end-template/node_modules
