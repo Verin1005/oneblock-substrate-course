@@ -56,9 +56,6 @@ pub mod pallet {
         // 链下工作者入口
         fn offchain_worker(block_number: BlockNumberFor<T>) {
             info!("---Entering off-chain worker");
-            info!("{:?}",b"pallet_example::indexing::36");
-            info!("{:?}",b"pallet_example::indexing::37");
-            info!("{:?}",b"pallet_example::indexing::38");
             // 获取 off-chain indexing 数据.
             let key = Self::derived_key(block_number);
             let index_storage_info = StorageValueRef::persistent(&key);
@@ -84,7 +81,7 @@ pub mod pallet {
             // 封装 index 数据
             let data = IndexingData(b"extrinsic".to_vec(), number);
             sp_io::offchain_index::set(&key, &data.encode());
-            info!("extrinsic");
+            info!("-- key = {:?}",key);
             Ok(())
         }
     }

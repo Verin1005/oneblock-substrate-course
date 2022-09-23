@@ -9,3 +9,6 @@ br:
 
 r:
 	cargo run --release -- --dev --enable-offchain-indexing true
+
+fr:
+	cd substrate-front-end-template && yarn start
