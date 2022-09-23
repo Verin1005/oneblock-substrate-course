@@ -6,3 +6,6 @@ b:
 
 br:
 	cargo build --release && ./target/release/node-template --dev
+
+r:
+	cargo run --release -- --dev --enable-offchain-indexing true
