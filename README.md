@@ -16,9 +16,13 @@
         - 是由主机环境生成的真正随机、不确定的种子。
         - 链下工作节点无法得知他人生成的随机数。
 
-## 可选的下周作业之前补上...
-
 1. （可选）在 Offchain Worker
    中，解决向链上发起不签名请求时剩下的那个错误。参考：https://github.com/paritytech/substrate/blob/master/frame/examples/offchain-worker/src/lib.rs
+    - 原因是: 相同的交易重复导入交易池中
+      - `.and_provides(...)`
+        - `provides` tag若没变,会确保一个相同的交易可导入交易池中,若`.priority()`优先级高会从池子中替换
+      - `.longevity(5)`
+        - 时好时坏是因为,之前的交易生命周期已经结束,从交易池中删除后,可以添加新的交易了.
 2. （可选）构思一个应用场景，描述如何使用 Offchain Features 三大组件去实现它
+通过 http get 请求, 查询 btc 的价格放入 `BoundedVec` 中,计算平均值预测下次价格值是多少.
 3. （可选）如果有时间，可以实现一个上述原型
