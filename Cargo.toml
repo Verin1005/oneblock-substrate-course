@@ -1,9 +1,9 @@
 [workspace]
+resolver = "2"
 members = [
-    "node",
-    "pallets/template",
-    "pallets/example",
-    "runtime",
+    'node',
+    'runtime',
 ]
+
 [profile.release]
-panic = "unwind"
+panic = 'unwind'

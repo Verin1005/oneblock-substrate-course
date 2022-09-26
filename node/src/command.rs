@@ -3,16 +3,17 @@ use crate::{
 	chain_spec,
 	cli::{Cli, Subcommand},
 	service,
+	service::ExecutorDispatch,
 };
+use contracts_node_runtime::{Block, EXISTENTIAL_DEPOSIT};
 use frame_benchmarking_cli::{BenchmarkCmd, ExtrinsicFactory, SUBSTRATE_REFERENCE_HARDWARE};
-use node_template_runtime::{Block, EXISTENTIAL_DEPOSIT};
 use sc_cli::{ChainSpec, RuntimeVersion, SubstrateCli};
 use sc_service::PartialComponents;
 use sp_keyring::Sr25519Keyring;
 
 impl SubstrateCli for Cli {
 	fn impl_name() -> String {
-		"Substrate Node".into()
+		"Substrate Contracts Node".into()
 	}
 
 	fn impl_version() -> String {
@@ -28,30 +29,45 @@ impl SubstrateCli for Cli {
 	}
 
 	fn support_url() -> String {
-		"support.anonymous.an".into()
+		"https://github.com/paritytech/substrate-contracts-node/issues/new".into()
 	}
 
 	fn copyright_start_year() -> i32 {
-		2017
+		2021
 	}
 
 	fn load_spec(&self, id: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		Ok(match id {
-			"dev" => Box::new(chain_spec::development_config()?),
-			"" | "local" => Box::new(chain_spec::local_testnet_config()?),
+			"" | "dev" => Box::new(chain_spec::development_config()?),
+			"local" => Box::new(chain_spec::local_testnet_config()?),
 			path =>
 				Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
 		})
 	}
 
 	fn native_runtime_version(_: &Box<dyn ChainSpec>) -> &'static RuntimeVersion {
-		&node_template_runtime::VERSION
+		&contracts_node_runtime::VERSION
 	}
 }
 
 /// Parse and run command line arguments
 pub fn run() -> sc_cli::Result<()> {
-	let cli = Cli::from_args();
+	let mut cli = Cli::from_args();
+
+	// this is a development node: make dev chain spec the default
+	if cli.run.shared_params.chain.is_none() {
+		cli.run.shared_params.dev = true;
+	}
+
+	// remove block production noise and output contracts debug buffer by default
+	if cli.run.shared_params.log.is_empty() {
+		cli.run.shared_params.log = vec![
+			"runtime::contracts=debug".into(),
+			"sc_cli=info".into(),
+			"sc_rpc_server=info".into(),
+			"warn".into(),
+		];
+	}
 
 	match &cli.subcommand {
 		Some(Subcommand::Key(cmd)) => cmd.run(&cli),
@@ -98,11 +114,7 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.async_run(|config| {
 				let PartialComponents { client, task_manager, backend, .. } =
 					service::new_partial(&config)?;
-				let aux_revert = Box::new(|client, _, blocks| {
-					sc_finality_grandpa::revert(client, blocks)?;
-					Ok(())
-				});
-				Ok((cmd.run(client, backend, Some(aux_revert)), task_manager))
+				Ok((cmd.run(client, backend, None), task_manager))
 			})
 		},
 		Some(Subcommand::Benchmark(cmd)) => {
@@ -111,6 +123,7 @@ pub fn run() -> sc_cli::Result<()> {
 			runner.sync_run(|config| {
 				// This switch needs to be in the client, since the client decides
 				// which sub-commands it wants to support.
+				// In the case of substrate-contract-node we only support benchmark for pallet
 				match cmd {
 					BenchmarkCmd::Pallet(cmd) => {
 						if !cfg!(feature = "runtime-benchmarks") {
@@ -121,7 +134,7 @@ pub fn run() -> sc_cli::Result<()> {
 							)
 						}
 
-						cmd.run::<Block, service::ExecutorDispatch>(config)
+						cmd.run::<Block, ExecutorDispatch>(config)
 					},
 					BenchmarkCmd::Block(cmd) => {
 						let PartialComponents { client, .. } = service::new_partial(&config)?;
@@ -132,14 +145,19 @@ pub fn run() -> sc_cli::Result<()> {
 							service::new_partial(&config)?;
 						let db = backend.expose_db();
 						let storage = backend.expose_storage();
-
 						cmd.run(config, client, db, storage)
 					},
 					BenchmarkCmd::Overhead(cmd) => {
 						let PartialComponents { client, .. } = service::new_partial(&config)?;
 						let ext_builder = RemarkBuilder::new(client.clone());
 
-						cmd.run(config, client, inherent_benchmark_data()?, &ext_builder)
+						cmd.run(
+							config,
+							client,
+							inherent_benchmark_data()?,
+							Vec::new(),
+							&ext_builder,
+						)
 					},
 					BenchmarkCmd::Extrinsic(cmd) => {
 						let PartialComponents { client, .. } = service::new_partial(&config)?;
@@ -153,7 +171,7 @@ pub fn run() -> sc_cli::Result<()> {
 							)),
 						]);
 
-						cmd.run(client, inherent_benchmark_data()?, &ext_factory)
+						cmd.run(client, inherent_benchmark_data()?, Vec::new(), &ext_factory)
 					},
 					BenchmarkCmd::Machine(cmd) =>
 						cmd.run(&config, SUBSTRATE_REFERENCE_HARDWARE.clone()),

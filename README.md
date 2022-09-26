@@ -1,231 +1,121 @@
-# Substrate Node Template
+# substrate-contracts-node
 
-[![Try on playground](https://img.shields.io/badge/Playground-Node_Template-brightgreen?logo=Parity%20Substrate)](https://docs.substrate.io/playground/) [![Matrix](https://img.shields.io/matrix/substrate-technical:matrix.org)](https://matrix.to/#/#substrate-technical:matrix.org)
+This repository contains Substrate's [`node-template`](https://github.com/paritytech/substrate/tree/master/bin/node-template)
+configured to include Substrate's [`pallet-contracts`](https://github.com/paritytech/substrate/tree/master/frame/contracts)
+‒ a smart contract module.
 
-A fresh FRAME-based [Substrate](https://www.substrate.io/) node, ready for hacking :rocket:
+This repository is tracking Substrate's `master`.
+The last time it was synchronized with Substrate was up to
+[021f712](https://github.com/paritytech/substrate/tree/021f71264133d1cf0db5bd3e0112dbf8dcecdd9d).
 
-## Getting Started
+_This repository contains a couple of modifications that make it unsuitable
+for a production deployment, but a great fit for development and testing:_
 
-Follow the steps below to get started with the Node Template, or get it up and running right from
-your browser in just a few clicks using
-the [Substrate Playground](https://docs.substrate.io/playground/) :hammer_and_wrench:
+* The unstable features of the [`pallet-contracts`](https://github.com/paritytech/substrate/tree/master/frame/contracts)
+  are enabled by default (see the [`runtime/Cargo.toml`](https://github.com/paritytech/substrate-contracts-node/blob/main/runtime/Cargo.toml)).
+* The consensus algorithm has been switched to `manual-seal` in
+  [#42](https://github.com/paritytech/substrate-contracts-node/pull/42).
+  Hereby blocks are authored immediately at every transaction, so there
+  is none of the typical six seconds block time associated with `grandpa` or `aura`.
+* _If no CLI arguments are passed the node is started in development mode
+  by default._
+* A custom logging filter is applied by default that hides block production noise
+  and prints the contracts debug buffer to the console.
+* _With each start of the node process the chain starts from genesis ‒ so no
+  chain state is retained, all contracts will be lost! If you want to retain
+  chain state you have to supply a `--base-path`._
+* For `pallet_contracts::Config` we increased the allowed contract sizes. This
+  avoids running into `CodeTooLarge` when uploading contracts during development.
+  See the comment in [`runtime/src/lib.rs`](https://github.com/paritytech/substrate-contracts-node/blob/main/runtime/src/lib.rs)
+  for more details.
 
-### Using Nix
+If you are looking for a node suitable for production see these configurations:
 
-Install [nix](https://nixos.org/) and optionally [direnv](https://github.com/direnv/direnv) and
-[lorri](https://github.com/nix-community/lorri) for a fully plug and play experience for setting up
-the development environment. To get all the correct dependencies activate direnv `direnv allow` and
-lorri `lorri shell`.
+* [Substrate Node Template](https://github.com/paritytech/substrate/tree/master/bin/node-template)
+* [Substrate Cumulus Parachain Template](https://github.com/paritytech/cumulus/tree/master/parachain-template)
+* [Contracts Parachain Configuration for Rococo](https://github.com/paritytech/cumulus/tree/master/parachains/runtimes/contracts/contracts-rococo)
 
-### Rust Setup
+## Installation
 
-First, complete the [basic Rust setup instructions](./docs/rust-setup.md).
+### Download Binary
 
-### Run
+The easiest way is to download a binary release from [our releases page](https://github.com/paritytech/substrate-contracts-node/releases)
+and just execute `./substrate-contracts-node`.
 
-Use Rust's native `cargo` command to build and launch the template node:
+### Build Locally
 
-```sh
-cargo run --release -- --dev
-```
+Follow the [official installation steps](https://docs.substrate.io/v3/getting-started/installation/)
+to set up all Substrate prerequisites.
 
-### Build
-
-The `cargo run` command will perform an initial build. Use the following command to build the node
-without launching it:
-
-```sh
-cargo build --release
-```
-
-### Embedded Docs
-
-Once the project has been built, the following command can be used to explore all parameters and
-subcommands:
-
-```sh
-./target/release/node-template -h
-```
-
-## Run
-
-The provided `cargo run` command will launch a temporary node and its state will be discarded after
-you terminate the process. After the project has been built, there are other ways to launch the
-node.
-
-### Single-Node Development Chain
-
-This command will start the single-node development chain with non-persistent state:
+Afterwards you can install this node via
 
 ```bash
-./target/release/node-template --dev
+cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --force --locked
 ```
 
-Purge the development chain's state:
+The `--locked` flag makes the installation use the same versions
+as the `Cargo.lock` in those repositories ‒ ensuring that the last
+known-to-work version of the dependencies are used.
+
+The latest confirmed working Substrate commit which will then be used is
+[021f712](https://github.com/paritytech/substrate/tree/021f71264133d1cf0db5bd3e0112dbf8dcecdd9d).
+
+## Usage
+
+To run a local dev node execute
 
 ```bash
-./target/release/node-template purge-chain --dev
+substrate-contracts-node
 ```
 
-Start the development chain with detailed logging:
+A new chain in temporary directory will be created each time the command is executed. This is the
+default for this node. If you want to persist chain state across runs you need to
+specify a directory with `--base-path`.
 
-```bash
-RUST_BACKTRACE=1 ./target/release/node-template -ldebug --dev
-```
+### Show only Errors and Contract Debug Output
 
-> Development chain means that the state of our chain will be in a tmp folder while the nodes are
-> running. Also, **alice** account will be authority and sudo account as declared in the
-> [genesis state](https://github.com/substrate-developer-hub/substrate-node-template/blob/main/node/src/chain_spec.rs#L49).
-> At the same time the following accounts will be pre-funded:
-> - Alice
-> - Bob
-> - Alice//stash
-> - Bob//stash
+To have only errors and contract debug output show up on the console you can
+supply `-lerror,runtime::contracts=debug` when starting the node.
 
-In case of being interested in maintaining the chain' state between runs a base path must be added
-so the db can be stored in the provided folder instead of a temporal one. We could use this folder
-to store different chain databases, as a different folder will be created per different chain that
-is ran. The following commands shows how to use a newly created folder as our db base path.
+Important: Debug output is only printed for RPC calls or off-chain tests ‒ not for transactions!
 
-```bash
-// Create a folder to use as the db base path
-$ mkdir my-chain-state
+See our FAQ for more details:
+[How do I print something to the console from the runtime?](https://paritytech.github.io/ink-docs/faq/#how-do-i-print-something-to-the-console-from-the-runtime).
 
-// Use of that folder to store the chain state
-$ ./target/release/node-template --dev --base-path ./my-chain-state/
+## Connect with frontend
 
-// Check the folder structure created inside the base path after running the chain
-$ ls ./my-chain-state
-chains
-$ ls ./my-chain-state/chains/
-dev
-$ ls ./my-chain-state/chains/dev
-db keystore network
-```
+Once the node template is running locally, you can connect to it with frontends like [Contracts UI](https://contracts-ui.substrate.io/#/?rpc=ws://127.0.0.1:9944) or [Polkadot-JS Apps](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944) and interact with your chain.
 
+## How to synchronize with Substrate
 
-### Connect with Polkadot-JS Apps Front-end
-
-Once the node template is running locally, you can connect it with **Polkadot-JS Apps** front-end
-to interact with your chain. [Click
-here](https://polkadot.js.org/apps/#/explorer?rpc=ws://localhost:9944) connecting the Apps to your
-local node template.
-
-### Multi-Node Local Testnet
-
-If you want to see the multi-node consensus algorithm in action, refer to our
-[Simulate a network tutorial](https://docs.substrate.io/tutorials/get-started/simulate-network/).
-
-## Template Structure
-
-A Substrate project such as this consists of a number of components that are spread across a few
-directories.
-
-### Node
-
-A blockchain node is an application that allows users to participate in a blockchain network.
-Substrate-based blockchain nodes expose a number of capabilities:
-
-- Networking: Substrate nodes use the [`libp2p`](https://libp2p.io/) networking stack to allow the
-  nodes in the network to communicate with one another.
-- Consensus: Blockchains must have a way to come to
-  [consensus](https://docs.substrate.io/main-docs/fundamentals/consensus/) on the state of the
-  network. Substrate makes it possible to supply custom consensus engines and also ships with
-  several consensus mechanisms that have been built on top of
-  [Web3 Foundation research](https://research.web3.foundation/en/latest/polkadot/NPoS/index.html).
-- RPC Server: A remote procedure call (RPC) server is used to interact with Substrate nodes.
-
-There are several files in the `node` directory - take special note of the following:
-
-- [`chain_spec.rs`](./node/src/chain_spec.rs): A
-  [chain specification](https://docs.substrate.io/main-docs/build/chain-spec/) is a
-  source code file that defines a Substrate chain's initial (genesis) state. Chain specifications
-  are useful for development and testing, and critical when architecting the launch of a
-  production chain. Take note of the `development_config` and `testnet_genesis` functions, which
-  are used to define the genesis state for the local development chain configuration. These
-  functions identify some
-  [well-known accounts](https://docs.substrate.io/reference/command-line-tools/subkey/)
-  and use them to configure the blockchain's initial state.
-- [`service.rs`](./node/src/service.rs): This file defines the node implementation. Take note of
-  the libraries that this file imports and the names of the functions it invokes. In particular,
-  there are references to consensus-related topics, such as the
-  [block finalization and forks](https://docs.substrate.io/main-docs/fundamentals/consensus/#finalization-and-forks)
-  and other [consensus mechanisms](https://docs.substrate.io/main-docs/fundamentals/consensus/#default-consensus-models)
-  such as Aura for block authoring and GRANDPA for finality.
-
-After the node has been [built](#build), refer to the embedded documentation to learn more about the
-capabilities and configuration parameters that it exposes:
-
-```shell
-./target/release/node-template --help
-```
-
-### Runtime
-
-In Substrate, the terms
-"runtime" and "state transition function"
-are analogous - they refer to the core logic of the blockchain that is responsible for validating
-blocks and executing the state changes they define. The Substrate project in this repository uses
-[FRAME](https://docs.substrate.io/main-docs/fundamentals/runtime-intro/#frame) to construct a
-blockchain runtime. FRAME allows runtime developers to declare domain-specific logic in modules
-called "pallets". At the heart of FRAME is a helpful
-[macro language](https://docs.substrate.io/reference/frame-macros/) that makes it easy to
-create pallets and flexibly compose them to create blockchains that can address
-[a variety of needs](https://substrate.io/ecosystem/projects/).
-
-Review the [FRAME runtime implementation](./runtime/src/lib.rs) included in this template and note
-the following:
-
-- This file configures several pallets to include in the runtime. Each pallet configuration is
-  defined by a code block that begins with `impl $PALLET_NAME::Config for Runtime`.
-- The pallets are composed into a single runtime by way of the
-  [`construct_runtime!`](https://crates.parity.io/frame_support/macro.construct_runtime.html)
-  macro, which is part of the core
-  FRAME Support [system](https://docs.substrate.io/reference/frame-pallets/#system-pallets) library.
-
-### Pallets
-
-The runtime in this project is constructed using many FRAME pallets that ship with the
-[core Substrate repository](https://github.com/paritytech/substrate/tree/master/frame) and a
-template pallet that is [defined in the `pallets`](./pallets/template/src/lib.rs) directory.
-
-A FRAME pallet is compromised of a number of blockchain primitives:
-
-- Storage: FRAME defines a rich set of powerful
-  [storage abstractions](https://docs.substrate.io/main-docs/build/runtime-storage/) that makes
-  it easy to use Substrate's efficient key-value database to manage the evolving state of a
-  blockchain.
-- Dispatchables: FRAME pallets define special types of functions that can be invoked (dispatched)
-  from outside of the runtime in order to update its state.
-- Events: Substrate uses [events and errors](https://docs.substrate.io/main-docs/build/events-errors/)
-  to notify users of important changes in the runtime.
-- Errors: When a dispatchable fails, it returns an error.
-- Config: The `Config` configuration interface is used to define the types and parameters upon
-  which a FRAME pallet depends.
-
-### Run in Docker
-
-First, install [Docker](https://docs.docker.com/get-docker/) and
-[Docker Compose](https://docs.docker.com/compose/install/).
-
-Then run the following command to start a single node development chain.
-
-```bash
-./scripts/docker_run.sh
-```
-
-This command will firstly compile your code, and then start a local development network. You can
-also replace the default command
-(`cargo build --release && ./target/release/node-template --dev --ws-external`)
-by appending your own. A few useful ones are as follow.
-
-```bash
-# Run Substrate node without re-compiling
-./scripts/docker_run.sh ./target/release/node-template --dev --ws-external
-
-# Purge the local dev chain
-./scripts/docker_run.sh ./target/release/node-template purge-chain --dev
-
-# Check whether the code is compilable
-./scripts/docker_run.sh cargo check
-```
+- [ ] Check Substrate's [`node-template`](https://github.com/paritytech/substrate/commits/master/bin/node-template)
+      for new commits since the last time someone synchronized this
+			repository with Substrate. The commit hash of the last sync is
+			mentioned in this readme.
+- [ ] Apply each commit that happened in this `node-template` folder
+      since the last sync.
+- [ ] Check commits for [`pallet-contracts`](https://github.com/paritytech/substrate/tree/master/frame/contracts)
+      since the last time someone synchronized this repository with Substrate
+      in order to not miss any important changes.
+- [ ] Execute `cargo update -p pallet-contracts` for this repository. The
+      specific crate which is mentioned here is actually not important: since
+      Substrate uses git references for its Substrate dependencies it means
+      that once one package is updated all are.
+- [ ] Increment the minor version number in `node/Cargo.toml` and `runtime/Cargo.toml`.
+- [ ] Execute `cargo run --release -- --tmp`. If successful, it should produce blocks
+      and a new, up to date, `Cargo.lock` will be created.
+- [ ] Update this readme with the hash of the Substrate `master` commit
+      with which you synchronized. The hash appears two times in this
+			readme.
+- [ ] Create a PR with the changes, have it reviewed and merged.
+- [ ] Replace `XX` in this command with your incremeted version number and execute it:
+      `git checkout main && git pull && git tag v0.XX.0 && git push origin v0.XX.0`.
+			This will push a new tag with the version number to this repository.
+- [ ] We have set this repository up in a way that tags à la `vX.X.X` trigger
+      a CI run that creates a GitHub draft release. You can observe CI runs on
+      [GitLab](https://gitlab.parity.io/parity/mirrors/substrate-contracts-node/-/pipelines).
+      This draft release will contain a binary for Linux and Mac and appear
+      under [Releases](https://github.com/paritytech/substrate-contracts-node/releases).
+      Add a description in the style of "Synchronized with Substrate commit
+      [c0ee2a](https://github.com/paritytech/substrate/tree/c0ee2adaa54b22ee0df5d1592cd0430961afd95c)."
+      and publish it.
