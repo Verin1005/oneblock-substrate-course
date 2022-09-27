@@ -3,10 +3,8 @@ t:
 
 env_stable:
 	rustup default stable
-env_nightly:
-	rustup default nightly
 b_contract: env_stable
-	cd erc20 && cargo contract build
+	cd erc20 && cargo contract build && rustup default nightly
 t_contract: env_stable
 	cd erc20 && cargo test
 
