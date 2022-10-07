@@ -13,6 +13,9 @@ bench-b:
 cp_template:
 	cp ../substrate/.maintain/frame-weight-template.hbs ./.maintain/frame-weight-template.hbs
 
+test_bench:
+	cargo test --package pallet-poe --features runtime-benchmarks
+
 bench: bench-b
 	./target/release/node-template benchmark pallet \
 		--chain=dev \
