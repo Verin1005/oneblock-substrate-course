@@ -4,9 +4,13 @@
 
 > 为 proof of existence (poe) 模块的可调用函数 create_claim, revoke_claim, transfer_claim 添加 benchmark 用例，并且将 benchmark 运行的结果应用在可调用函数上；
 
-- `make bench` 生成`weights`文件
+### `make bench` 生成`weights`文件
+
+[weights.rs](https://github.com/hello-substrate/oneblock-substrate-course/blob/course-6/pallets/poe/src/weights.rs)
 
 ### 编写 `benchmarking.rs`
+
+[benchmarking.rs](https://github.com/hello-substrate/oneblock-substrate-course/blob/course-6/pallets/poe/src/benchmarking.rs)
 
 ```
 revoke_claim {
@@ -24,6 +28,8 @@ revoke_claim {
 
 ### `weights.rs` 应用到可调度函数上
 
+[lib.rs#L101](https://github.com/hello-substrate/oneblock-substrate-course/blob/course-6/pallets/poe/src/lib.rs#L101)
+
 ```
 #[pallet::weight(T::WeightInfo::revoke_claim(claim.len() as u32))]
 ```
@@ -34,11 +40,15 @@ revoke_claim {
 
 - 生成可编辑的 Chain Spec 文件
 
+[customSpec.json](https://github.com/hello-substrate/oneblock-substrate-course/blob/course-6/customSpec.json)
+
 ```
 cargo build --release && ./target/release/node-template build-spec --disable-default-bootnode --chain dev > customSpec.json
 ```
 
 - 转换为原始规范格式才能使用
+
+[customSpecRaw.json](https://github.com/hello-substrate/oneblock-substrate-course/blob/course-6/customSpecRaw.json)
 
 ```
 ./target/release/node-template build-spec --chain=customSpec.json --raw --disable-default-bootnode > customSpecRaw.json
