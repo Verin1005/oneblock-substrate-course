@@ -1,16 +1,7 @@
 # oneblock substrate course
 
-oneblock 进阶系列课程作业仓库
+1. 为 proof of existence (poe) 模块的可调用函数 create_claim, revoke_claim, transfer_claim 添加 benchmark 用例，并且将 benchmark 运行的结果应用在可调用函数上；
+    - `make bench`
 
-## poe 文件存证代码以及测试用例
-
-1. [调度函数代码地址](https://github.com/hello-substrate/oneblock-substrate-course/blob/1-1-poe/pallets/poe/src/lib.rs#L74)
-2. [测试函数地址](https://github.com/hello-substrate/oneblock-substrate-course/blob/1-1-poe/pallets/poe/src/tests.rs#L7)
-
-## 测试运行截图
-
-![测试运行截图](./docs/test.jpg)
-
-## 项目运行截图
-
-![项目运行截图](./docs/run_dev.jpg)
+2. 选择 node-template 或者其它节点程序，生成 Chain Spec 文件（两种格式都需要）；
+3. （附加题）根据 Chain Spec，部署公开测试网络
